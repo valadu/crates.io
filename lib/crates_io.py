@@ -2,18 +2,24 @@ __all__ = ['CratesIO']
 
 
 import datetime
+import json
 import math
 import time
 import typing as t
 
 import httpx
 import retrying
+import sys
 import tqdm
 
 
 @retrying.retry(stop_max_attempt_number=7, wait_fixed=1_000)
 def get(route: str, params: t.Optional[t.Dict] = None) -> httpx.Response:
     return httpx.get(f'https://crates.io{route}', params=params)
+
+
+def jsonify(obj: t.Any) -> str:
+    return json.dumps(obj, ensure_ascii=False, separators=(',', ':'))
 
 
 class CratesIO:
@@ -37,7 +43,7 @@ class CratesIO:
 
     def crates(self, delay: float = 1.0, per_page: int = 50, sort: str = 'alpha') -> t.Iterator['Crate']:
         pages = range(math.ceil(self.number()/per_page))
-        for page in tqdm.tqdm(pages):
+        for page in tqdm.tqdm(pages, file=sys.stdout):
             yield from self.crates_by_page(page+1, per_page, sort)
             time.sleep(delay)
 
@@ -45,9 +51,23 @@ class CratesIO:
         try:
             data = self._crates(page, per_page, sort)
         except Exception as e:
-            print(page, e)
+            print(page, e, file=sys.stderr)
         else:
             yield from map(Crate, data['crates'])
+
+    def categories_to_str(self) -> str:
+        data = self.categories
+        return '\n'.join(
+            f'{key}\t{jsonify(data[key])}'
+            for key in sorted(data)
+        )
+
+    def keywords_to_str(self) -> str:
+        data = self.keywords
+        return '\n'.join(
+            f'{key}\t{jsonify(data[key])}'
+            for key in sorted(data)
+        )
 
     def _crates(self, page: int, per_page: int, sort: str) -> t.Dict:
         params = {'page': page, 'per_page': per_page, 'sort': sort}
@@ -118,6 +138,9 @@ class Crate:
             keywords_ = None
         self._data.update({'categories': categories_, 'keywords': keywords_})
         return self
+
+    def to_json(self) -> str:
+        return jsonify(self._data)
 
     def _timestamp(self, string: str) -> t.Optional[float]:
         try:

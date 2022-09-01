@@ -8,3 +8,6 @@ help:  ## Print the usage
 
 mypy:  ## Check static type for Python
 	$(PYTHON) -m mypy lib/
+
+main:  ## Run main program
+	$(PYTHON) -m lib 2>stderr.log

@@ -1,4 +1,5 @@
-__all__ = ['Git']
+__all__ = ['CratesIO', 'Git']
 
 
+from .crates_io import CratesIO
 from .git import Git

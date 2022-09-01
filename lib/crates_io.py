@@ -7,9 +7,11 @@ import time
 import typing as t
 
 import httpx
+import retrying
 import tqdm
 
 
+@retrying.retry(stop_max_attempt_number=7, wait_fixed=1_000)
 def get(route: str, params: t.Optional[t.Dict] = None) -> httpx.Response:
     return httpx.get(f'https://crates.io{route}', params=params)
 
@@ -19,6 +21,9 @@ class CratesIO:
     Reference:
         - https://crates.io
     '''
+
+    categories: t.Dict = {}
+    keywords: t.Dict = {}
 
     def __init__(self) -> None:
         pass
@@ -30,22 +35,22 @@ class CratesIO:
         first_page = self._crates(1, 50, 'alpha')
         return first_page['meta']['total']
 
-    def crates(self, delay: float = 1.0, number: int = 50, sort: str = 'alpha') -> t.Iterator[t.Dict]:
-        pages = range(math.ceil(self.number()/number))
+    def crates(self, delay: float = 1.0, per_page: int = 50, sort: str = 'alpha') -> t.Iterator['Crate']:
+        pages = range(math.ceil(self.number()/per_page))
         for page in tqdm.tqdm(pages):
-            yield from self.crates_by_page(page+1, number, sort)
+            yield from self.crates_by_page(page+1, per_page, sort)
             time.sleep(delay)
 
-    def crates_by_page(self, page: int, number: int = 50, sort: str = 'alpha') -> t.Iterator[t.Dict]:
+    def crates_by_page(self, page: int, per_page: int = 50, sort: str = 'alpha') -> t.Iterator['Crate']:
         try:
-            data = self._crates(page, number, sort)
+            data = self._crates(page, per_page, sort)
         except Exception as e:
             print(page, e)
         else:
             yield from map(Crate, data['crates'])
 
-    def _crates(self, page: int, number: int, sort: str) -> t.Dict:
-        params = {'page': page, 'per_page': number, 'sort': sort}
+    def _crates(self, page: int, per_page: int, sort: str) -> t.Dict:
+        params = {'page': page, 'per_page': per_page, 'sort': sort}
         return get('/api/v1/crates', params=params).json()
 
 
@@ -54,7 +59,7 @@ class Crate:
     def __init__(self, data: t.Dict) -> None:
         self._data = {
             'badges': data.get('badges', None),
-            'date': {
+            'timestamp': {
                 'create': self._timestamp(data.get('created_at', '')),
                 'update': self._timestamp(data.get('updated_at', '')),
             },
@@ -83,10 +88,35 @@ class Crate:
 
     def fullize(self) -> 'Crate':
         extra = get(f'/api/v1/crates/{self._data["name"]}', params=None).json()
-        self._data.update({
-            'categories': extra.get('categories', None),
-            'keywords': extra.get('keywords', None),
-        })
+        # categories
+        categories = extra.get('categories', None)
+        if categories is not None:
+            for category in categories:
+                key = category.get('id', None)
+                if key not in CratesIO.categories:
+                    CratesIO.categories[key] = {
+                        'name': category.get('category', None),
+                        'count': category.get('crates_cnt', None),
+                        'timestamp': self._timestamp(category.get('created_at', '')),
+                    }
+            categories_ = [c.get('id', None) for c in categories]
+        else:
+            categories_ = None
+        # keywords
+        keywords = extra.get('keywords', None)
+        if keywords is not None:
+            for keyword in keywords:
+                key = keyword.get('id', None)
+                if key not in CratesIO.keywords:
+                    CratesIO.keywords[key] = {
+                        'name': keyword.get('keyword', None),
+                        'count': keyword.get('crates_cnt', None),
+                        'timestamp': self._timestamp(keyword.get('created_at', '')),
+                    }
+            keywords_ = [k.get('id', None) for k in keywords]
+        else:
+            keywords_ = None
+        self._data.update({'categories': categories_, 'keywords': keywords_})
         return self
 
     def _timestamp(self, string: str) -> t.Optional[float]:

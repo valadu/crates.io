@@ -4,12 +4,13 @@ __all__ = ['CratesIO']
 import datetime
 import json
 import math
+import sys
+import traceback
 import time
 import typing as t
 
 import httpx
 import retrying
-import sys
 import tqdm
 
 
@@ -52,6 +53,7 @@ class CratesIO:
             data = self._crates(page, per_page, sort)
         except Exception as e:
             print(page, e, file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
         else:
             yield from map(Crate, data['crates'])
 
@@ -107,7 +109,10 @@ class Crate:
         return self._data
 
     def fullize(self) -> 'Crate':
-        extra = get(f'/api/v1/crates/{self._data["name"]}')
+        try:
+            extra = get(f'/api/v1/crates/{self._data["name"]}')
+        except:
+            traceback.print_exc(file=sys.stderr)
         # categories
         categories = extra.get('categories', None)
         if categories is not None:

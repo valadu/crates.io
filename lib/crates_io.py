@@ -13,9 +13,9 @@ import sys
 import tqdm
 
 
-@retrying.retry(stop_max_attempt_number=7, wait_fixed=1_000)
-def get(route: str, params: t.Optional[t.Dict] = None) -> httpx.Response:
-    return httpx.get(f'https://crates.io{route}', params=params)
+@retrying.retry(stop_max_attempt_number=7, wait_fixed=7_000)
+def get(route: str, params: t.Optional[t.Dict] = None) -> t.Dict:
+    return httpx.get(f'https://crates.io{route}', params=params).json()
 
 
 def jsonify(obj: t.Any) -> str:
@@ -71,7 +71,7 @@ class CratesIO:
 
     def _crates(self, page: int, per_page: int, sort: str) -> t.Dict:
         params = {'page': page, 'per_page': per_page, 'sort': sort}
-        return get('/api/v1/crates', params=params).json()
+        return get('/api/v1/crates', params=params)
 
 
 class Crate:
@@ -107,7 +107,7 @@ class Crate:
         return self._data
 
     def fullize(self) -> 'Crate':
-        extra = get(f'/api/v1/crates/{self._data["name"]}', params=None).json()
+        extra = get(f'/api/v1/crates/{self._data["name"]}')
         # categories
         categories = extra.get('categories', None)
         if categories is not None:

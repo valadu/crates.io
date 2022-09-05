@@ -1,7 +1,7 @@
 PYTHON = python
 
 
-.PHONY: help mypy
+.PHONY: help mypy data
 
 help:  ## Print the usage
 	@fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##//'
@@ -9,5 +9,5 @@ help:  ## Print the usage
 mypy:  ## Check static type for Python
 	$(PYTHON) -m mypy lib/
 
-main:  ## Run main program
+data:  ## Run main program in lib library to collect data
 	$(PYTHON) -m lib 2>stderr.log

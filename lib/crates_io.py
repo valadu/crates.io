@@ -147,8 +147,21 @@ class Crate:
     def to_json(self) -> str:
         return jsonify(self._data)
 
+    def verbose(self, level: int = 0) -> str:
+        data = self._data
+        if level == 0:
+            return f'<{data["name"]}>'
+        elif level == 1:
+            t = time.localtime(data['timestamp']['create'])
+            return f'<{data["name"]}={data["version"]["newest"]} @ {self._date(t)}>'
+        else:
+            raise NotImplementedError
+
     def _timestamp(self, string: str) -> t.Optional[float]:
         try:
             return datetime.datetime.fromisoformat(string).timestamp()
         except ValueError:
             return None
+
+    def _date(self, t: time.struct_time) -> str:
+        return time.strftime('%Y/%m/%d', t)

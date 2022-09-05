@@ -10,6 +10,8 @@ retrying = "*"
 
 [dev-packages]
 mypy = "*"
+pandas = "*"
+tabulate = "*"
 
 [requires]
 python_version = "3.8"
